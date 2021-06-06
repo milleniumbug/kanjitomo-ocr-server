@@ -16,39 +16,43 @@ data class FailureStatus(val status: String)
 
 fun main(args: Array<String>) {
     val kanjiTomo = KanjiTomo2()
-    kanjiTomo.loadData()
+    try {
+        kanjiTomo.loadData()
 
-    val http = ignite().port(8080)
-    http.post("/ocr") { request, response ->
-        val bytes = request.bodyAsBytes()
-        val image = ByteArrayInputStream(bytes).use { stream ->
-            ImageIO.read(stream)
-        }
-        val areaTask = kanjiTomo.setTargetImage(image)
-        val columns = kanjiTomo.getColumns(areaTask)
-        val isVertical = columns.all { column -> column.vertical }
-        val sortedColumns =
-            if (isVertical) {
-                columns.sortedByDescending { column -> column.rect.x }
-            } else {
-                columns.sortedBy { column -> column.rect.y }
+        val http = ignite().port(8080)
+        http.post("/ocr") { request, response ->
+            val bytes = request.bodyAsBytes()
+            val image = ByteArrayInputStream(bytes).use { stream ->
+                ImageIO.read(stream)
             }
-        val ocrText = StringBuilder()
-        for (column in sortedColumns) {
-            val result = kanjiTomo.runOCR(areaTask, column.areas)
-            if (result != null) {
-                ocrText.appendLine(result.bestMatchingCharacters)
+            val areaTask = kanjiTomo.setTargetImage(image)
+            val columns = kanjiTomo.getColumns(areaTask)
+            val isVertical = columns.all { column -> column.vertical }
+            val sortedColumns =
+                if (isVertical) {
+                    columns.sortedByDescending { column -> column.rect.x }
+                } else {
+                    columns.sortedBy { column -> column.rect.y }
+                }
+            val ocrText = StringBuilder()
+            for (column in sortedColumns) {
+                val result = kanjiTomo.runOCR(areaTask, column.areas)
+                if (result != null) {
+                    ocrText.appendLine(result.bestMatchingCharacters)
+                } else {
+                    response.status(400)
+                    response.header("Content-Type", "application/json")
+                    return@post Json.encodeToString(serializer<FailureStatus>(), FailureStatus("failure"))
+                }
             }
-            else {
-                response.status(400)
-                response.header("Content-Type", "application/json")
-                return@post Json.encodeToString(serializer<FailureStatus>(), FailureStatus("failure"))
-            }
-        }
 
-        response.status(200)
-        response.header("Content-Type", "application/json")
-        Json.encodeToString(serializer<SuccessStatus>(), SuccessStatus("success", ocrText.toString(), isVertical))
+            response.status(200)
+            response.header("Content-Type", "application/json")
+            Json.encodeToString(serializer<SuccessStatus>(), SuccessStatus("success", ocrText.toString(), isVertical))
+        }
+    }
+    finally {
+        kanjiTomo.close()
     }
 }
 
