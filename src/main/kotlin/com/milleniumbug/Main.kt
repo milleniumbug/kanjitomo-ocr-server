@@ -3,6 +3,7 @@ package com.milleniumbug
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import net.kanjitomo.util.Parameters
 import spark.Service.ignite
 import java.io.ByteArrayInputStream
 import java.lang.StringBuilder
@@ -15,6 +16,9 @@ data class SuccessStatus(val status: String, val result: String, val isVertical:
 data class FailureStatus(val status: String)
 
 fun main(args: Array<String>) {
+    val parameters = Parameters.getInstance()
+    parameters.primaryDictionary = null
+    parameters.secondaryDictionary = null
     val kanjiTomo = KanjiTomo2()
     kanjiTomo.loadData()
 
